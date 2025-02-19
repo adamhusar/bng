@@ -238,7 +238,7 @@ const int INT_INVALID = INT32_MAX;
 const uint ID_INVALID = UINT_INVALID; // general invalid index, should not be used when a definition for a specific type is available
 const uint ID_INVALID2 = UINT32_MAX - 1; // second general invalid id, might be used for special values
 const uint INDEX_INVALID = UINT_INVALID; // general invalid index, should not be used when a definition for a specific type is available
-const uint INDEX_INVALID2 = UINT32_MAX - 2; // second general invalid index, might be used for special values
+const uint INDEX_INVALID2 = UINT32_MAX - 1; // second general invalid index, might be used for special values (-2 previously)
 
 namespace BNG {
 // unique species id,
@@ -342,7 +342,7 @@ static inline std::ostream& perf() {
 }
 
 /**
- * Set based on boost's flat_set. 
+ * Set based on boost's flat_set.
  * Used to hold sets of ids or indices of molecules or other items,
  * extended to check for unique insertions and checked removals.
  *
@@ -412,9 +412,9 @@ public:
 
 /**
  * Map based on boost's flat_map.
- * 
+ *
  * Not used yet
- */ 
+ */
 template<typename Key, typename Value>
 class uint_flat_map: public boost::container::flat_map<Key, Value> {
 
@@ -422,7 +422,7 @@ class uint_flat_map: public boost::container::flat_map<Key, Value> {
 
 /**
  * Map based on googles's dense_hash_map.
- * 
+ *
  *  Warning: value must be POD (plain old data), this is not checked during compilations.
  *
  *  Not used yet

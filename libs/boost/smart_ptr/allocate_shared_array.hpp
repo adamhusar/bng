@@ -8,25 +8,20 @@ Distributed under the Boost Software License, Version 1.0.
 #ifndef BOOST_SMART_PTR_ALLOCATE_SHARED_ARRAY_HPP
 #define BOOST_SMART_PTR_ALLOCATE_SHARED_ARRAY_HPP
 
+#include <boost/core/allocator_access.hpp>
 #include <boost/core/alloc_construct.hpp>
 #include <boost/core/first_scalar.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
-#include <boost/type_traits/alignment_of.hpp>
-#include <boost/type_traits/enable_if.hpp>
-#include <boost/type_traits/extent.hpp>
-#include <boost/type_traits/is_bounded_array.hpp>
-#include <boost/type_traits/is_unbounded_array.hpp>
-#include <boost/type_traits/remove_cv.hpp>
-#include <boost/type_traits/remove_extent.hpp>
-#include <boost/type_traits/type_with_alignment.hpp>
+#include <boost/smart_ptr/detail/sp_type_traits.hpp>
+#include <type_traits>
 
 namespace boost {
 namespace detail {
 
 template<class T>
 struct sp_array_element {
-    typedef typename boost::remove_cv<typename
-        boost::remove_extent<T>::type>::type type;
+    typedef typename std::remove_cv<typename
+        std::remove_extent<T>::type>::type type;
 };
 
 template<class T>
@@ -57,21 +52,9 @@ struct sp_align_up {
     };
 };
 
-#if !defined(BOOST_NO_CXX11_ALLOCATOR)
-template<class A, class T>
-struct sp_bind_allocator {
-    typedef typename std::allocator_traits<A>::template rebind_alloc<T> type;
-};
-#else
-template<class A, class T>
-struct sp_bind_allocator {
-    typedef typename A::template rebind<T>::other type;
-};
-#endif
-
 template<class T>
-BOOST_CONSTEXPR inline std::size_t
-sp_objects(std::size_t size) BOOST_SP_NOEXCEPT
+constexpr inline std::size_t
+sp_objects(std::size_t size) noexcept
 {
     return (size + sizeof(T) - 1) / sizeof(T);
 }
@@ -82,15 +65,15 @@ public:
     typedef A type;
 
     template<class U>
-    sp_array_state(const U& _allocator, std::size_t _size) BOOST_SP_NOEXCEPT
+    sp_array_state(const U& _allocator, std::size_t _size) noexcept
         : allocator_(_allocator),
           size_(_size) { }
 
-    A& allocator() BOOST_SP_NOEXCEPT {
+    A& allocator() noexcept {
         return allocator_;
     }
 
-    std::size_t size() const BOOST_SP_NOEXCEPT {
+    std::size_t size() const noexcept {
         return size_;
     }
 
@@ -105,14 +88,14 @@ public:
     typedef A type;
 
     template<class U>
-    sp_size_array_state(const U& _allocator, std::size_t) BOOST_SP_NOEXCEPT
+    sp_size_array_state(const U& _allocator, std::size_t) noexcept
         : allocator_(_allocator) { }
 
-    A& allocator() BOOST_SP_NOEXCEPT {
+    A& allocator() noexcept {
         return allocator_;
     }
 
-    BOOST_CONSTEXPR std::size_t size() const BOOST_SP_NOEXCEPT {
+    constexpr std::size_t size() const noexcept {
         return N;
     }
 
@@ -123,8 +106,8 @@ private:
 template<class T, class U>
 struct sp_array_alignment {
     enum {
-        value = sp_max_size<boost::alignment_of<T>::value,
-            boost::alignment_of<U>::value>::value
+        value = sp_max_size<std::alignment_of<T>::value,
+            std::alignment_of<U>::value>::value
     };
 };
 
@@ -137,7 +120,7 @@ struct sp_array_offset {
 
 template<class U, class T>
 inline U*
-sp_array_start(T* base) BOOST_SP_NOEXCEPT
+sp_array_start(T* base) noexcept
 {
     enum {
         size = sp_array_offset<T, U>::value
@@ -153,12 +136,12 @@ class sp_array_creator {
         offset = sp_array_offset<T, element>::value
     };
 
-    typedef typename boost::type_with_alignment<sp_array_alignment<T,
+    typedef typename sp_type_with_alignment<sp_array_alignment<T,
         element>::value>::type type;
 
 public:
     template<class U>
-    sp_array_creator(const U& other, std::size_t size) BOOST_SP_NOEXCEPT
+    sp_array_creator(const U& other, std::size_t size) noexcept
         : other_(other),
           size_(sp_objects<type>(offset + sizeof(element) * size)) { }
 
@@ -171,7 +154,7 @@ public:
     }
 
 private:
-    typename sp_bind_allocator<A, type>::type other_;
+    typename boost::allocator_rebind<A, type>::type other_;
     std::size_t size_;
 };
 
@@ -202,32 +185,33 @@ public:
             boost::first_scalar(&list), count);
     }
 
-    T& state() BOOST_SP_NOEXCEPT {
+    T& state() noexcept {
         return state_;
     }
 
-    virtual void dispose() BOOST_SP_NOEXCEPT {
+    void dispose() noexcept override {
         boost::alloc_destroy_n(state_.allocator(),
             boost::first_scalar(sp_array_start<type>(this)),
             state_.size() * sp_array_count<type>::value);
     }
 
-    virtual void destroy() BOOST_SP_NOEXCEPT {
+    void destroy() noexcept override {
         sp_array_creator<allocator, sp_array_base> other(state_.allocator(),
             state_.size());
         this->~sp_array_base();
         other.destroy(this);
     }
 
-    virtual void* get_deleter(const sp_typeinfo_&) BOOST_SP_NOEXCEPT {
+    void* get_deleter(const sp_typeinfo_&) noexcept override {
         return 0;
     }
 
-    virtual void* get_local_deleter(const sp_typeinfo_&) BOOST_SP_NOEXCEPT {
+    void* get_local_deleter(const sp_typeinfo_&)
+        noexcept override {
         return 0;
     }
 
-    virtual void* get_untyped_deleter() BOOST_SP_NOEXCEPT {
+    void* get_untyped_deleter() noexcept override {
         return 0;
     }
 
@@ -249,11 +233,11 @@ public:
         }
     }
 
-    T* get() const BOOST_SP_NOEXCEPT {
+    T* get() const noexcept {
         return result_;
     }
 
-    void release() BOOST_SP_NOEXCEPT {
+    void release() noexcept {
         result_ = 0;
     }
 
@@ -268,11 +252,11 @@ private:
 } /* detail */
 
 template<class T, class A>
-inline typename enable_if_<is_unbounded_array<T>::value, shared_ptr<T> >::type
+inline typename std::enable_if<detail::sp_is_unbounded_array<T>::value, shared_ptr<T> >::type
 allocate_shared(const A& allocator, std::size_t count)
 {
     typedef typename detail::sp_array_element<T>::type element;
-    typedef typename detail::sp_bind_allocator<A, element>::type other;
+    typedef typename allocator_rebind<A, element>::type other;
     typedef detail::sp_array_state<other> state;
     typedef detail::sp_array_base<state> base;
     detail::sp_array_result<other, base> result(allocator, count);
@@ -285,15 +269,15 @@ allocate_shared(const A& allocator, std::size_t count)
 }
 
 template<class T, class A>
-inline typename enable_if_<is_bounded_array<T>::value, shared_ptr<T> >::type
+inline typename std::enable_if<detail::sp_is_bounded_array<T>::value, shared_ptr<T> >::type
 allocate_shared(const A& allocator)
 {
     enum {
-        count = extent<T>::value
+        count = std::extent<T>::value
     };
     typedef typename detail::sp_array_element<T>::type element;
-    typedef typename detail::sp_bind_allocator<A, element>::type other;
-    typedef detail::sp_size_array_state<other, extent<T>::value> state;
+    typedef typename allocator_rebind<A, element>::type other;
+    typedef detail::sp_size_array_state<other, std::extent<T>::value> state;
     typedef detail::sp_array_base<state> base;
     detail::sp_array_result<other, base> result(allocator, count);
     base* node = result.get();
@@ -305,12 +289,12 @@ allocate_shared(const A& allocator)
 }
 
 template<class T, class A>
-inline typename enable_if_<is_unbounded_array<T>::value, shared_ptr<T> >::type
+inline typename std::enable_if<detail::sp_is_unbounded_array<T>::value, shared_ptr<T> >::type
 allocate_shared(const A& allocator, std::size_t count,
-    const typename remove_extent<T>::type& value)
+    const typename std::remove_extent<T>::type& value)
 {
     typedef typename detail::sp_array_element<T>::type element;
-    typedef typename detail::sp_bind_allocator<A, element>::type other;
+    typedef typename allocator_rebind<A, element>::type other;
     typedef detail::sp_array_state<other> state;
     typedef detail::sp_array_base<state> base;
     detail::sp_array_result<other, base> result(allocator, count);
@@ -323,16 +307,16 @@ allocate_shared(const A& allocator, std::size_t count,
 }
 
 template<class T, class A>
-inline typename enable_if_<is_bounded_array<T>::value, shared_ptr<T> >::type
+inline typename std::enable_if<detail::sp_is_bounded_array<T>::value, shared_ptr<T> >::type
 allocate_shared(const A& allocator,
-    const typename remove_extent<T>::type& value)
+    const typename std::remove_extent<T>::type& value)
 {
     enum {
-        count = extent<T>::value
+        count = std::extent<T>::value
     };
     typedef typename detail::sp_array_element<T>::type element;
-    typedef typename detail::sp_bind_allocator<A, element>::type other;
-    typedef detail::sp_size_array_state<other, extent<T>::value> state;
+    typedef typename allocator_rebind<A, element>::type other;
+    typedef detail::sp_size_array_state<other, std::extent<T>::value> state;
     typedef detail::sp_array_base<state> base;
     detail::sp_array_result<other, base> result(allocator, count);
     base* node = result.get();
@@ -344,14 +328,14 @@ allocate_shared(const A& allocator,
 }
 
 template<class T, class A>
-inline typename enable_if_<is_unbounded_array<T>::value, shared_ptr<T> >::type
+inline typename std::enable_if<detail::sp_is_unbounded_array<T>::value, shared_ptr<T> >::type
 allocate_shared_noinit(const A& allocator, std::size_t count)
 {
     return boost::allocate_shared<T>(boost::noinit_adapt(allocator), count);
 }
 
 template<class T, class A>
-inline typename enable_if_<is_bounded_array<T>::value, shared_ptr<T> >::type
+inline typename std::enable_if<detail::sp_is_bounded_array<T>::value, shared_ptr<T> >::type
 allocate_shared_noinit(const A& allocator)
 {
     return boost::allocate_shared<T>(boost::noinit_adapt(allocator));
